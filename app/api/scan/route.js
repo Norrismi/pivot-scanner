@@ -1,6 +1,52 @@
-import { getQuote, getBasicFinancials, SCAN_UNIVERSE } from '@/app/lib/finnhub';
+import { getQuote, getBasicFinancials } from '@/app/lib/finnhub';
 
-// Fetch quote + financials for a symbol in parallel
+// ─── Per-scan universes ───────────────────────────────────────────────────────
+// Each scan targets only the names that realistically produce that setup.
+// Keeping these lists tight eliminates dead API calls and speeds up results.
+
+// Buyable Gap Ups: volatile growth, momentum, and high-beta tech.
+// Blue chips rarely gap 1.5%+ meaningfully — skip them.
+const GAP_UP_UNIVERSE = [
+  'NVDA','AMD','META','TSLA','AMZN','GOOGL','MSFT','AAPL','AVGO','NFLX',
+  'CRWD','PANW','DDOG','PLTR','APP','MELI','SHOP','DASH','AXON','FTNT',
+  'COIN','HOOD','MSTR','AFRM','SOFI','UPST','DKNG','RBLX','SNAP','U',
+  'RIVN','LCID','CRWV','PENN','CHWY','W','WISH',
+  'PYPL','INTU','ADBE','ISRG','REGN','VRTX','AMGN','GILD','MRNA',
+  'SOXL','TQQQ','ARKK',
+];
+
+// Recent Doublers: growth and momentum names capable of 80%+ 52W returns.
+// Utilities, staples, and financials almost never qualify.
+const DOUBLERS_UNIVERSE = [
+  'NVDA','AMD','META','TSLA','AVGO','NFLX','AMZN','GOOGL',
+  'CRWD','PANW','DDOG','PLTR','APP','MELI','SHOP','DASH','AXON','FTNT',
+  'COIN','HOOD','MSTR','AFRM','SOFI','UPST','DKNG','RBLX','SNAP','U',
+  'RIVN','LCID','CRWV','PENN','CHWY','W',
+  'PYPL','INTU','ADBE','ISRG','REGN','VRTX','KLAC','LRCX','MRVL','MPWR',
+  'CELH','SMCI','FICO','DECK','BLDR','SOXL','TQQQ','ARKK',
+];
+
+// Strong Movers: broad universe including large caps — big names move on
+// earnings, macro events, and news. Volume filter does the heavy lifting here.
+const STRONG_MOVERS_UNIVERSE = [
+  // Mega cap
+  'AAPL','MSFT','NVDA','GOOGL','META','AMZN','TSLA','AMD','AVGO','NFLX',
+  // Growth / tech
+  'CRWD','PANW','DDOG','PLTR','APP','MELI','SHOP','DASH','AXON','FTNT',
+  'PYPL','INTU','ADBE','ISRG','KLAC','LRCX','MRVL','MPWR','QCOM','INTC',
+  // Momentum
+  'COIN','HOOD','MSTR','AFRM','SOFI','UPST','DKNG','RBLX','SNAP','U',
+  'RIVN','LCID','CRWV','PENN','CHWY',
+  // Large cap movers
+  'JPM','BAC','GS','MS','WFC','V','MA','UNH','LLY','JNJ',
+  'XOM','CVX','COP','SLB','OXY','BA','CAT','DE','GE',
+  'WMT','HD','TGT','NKE','MCD','COST',
+  // Leveraged ETFs — move big every day
+  'SOXL','SOXS','TQQQ','SQQQ','ARKK',
+];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 async function enrichSymbol(symbol) {
   const [quote, fins] = await Promise.all([
     getQuote(symbol),
@@ -10,8 +56,6 @@ async function enrichSymbol(symbol) {
   return { ...quote, ...fins };
 }
 
-// Batch-fetch with concurrency cap to stay under 60 calls/min
-// Each symbol = 2 calls, so 20 concurrent = 40 calls/batch, well within limits
 async function batchFetch(symbols, concurrency = 20) {
   const results = [];
   for (let i = 0; i < symbols.length; i += concurrency) {
@@ -24,25 +68,33 @@ async function batchFetch(symbols, concurrency = 20) {
   return results;
 }
 
-// Filter helpers — straight from the trading plan
-const hasMinVolume = (s) => (s.avgVolume10Day ?? 0) >= 5;         // 5M+ avg daily volume
-const isUpToday = (s) => (s.changePercent ?? 0) > 0;
-const isGappingUp = (s) => {
+// ─── Filters ──────────────────────────────────────────────────────────────────
+
+const hasMinVolume   = (s) => (s.avgVolume10Day ?? 0) >= 5;
+const isUpToday      = (s) => (s.changePercent ?? 0) > 0;
+const isGappingUp    = (s) => {
   if (!s.open || !s.previousClose) return false;
   return ((s.open - s.previousClose) / s.previousClose) * 100 >= 1.5;
 };
-const isDoubler = (s) => (s.weekReturn52 ?? 0) >= 80;
-const isStrongMover = (s) => (s.changePercent ?? 0) >= 3 && (s.avgVolume10Day ?? 0) >= 10;
+const isDoubler      = (s) => (s.weekReturn52 ?? 0) >= 80;
+const isStrongMover  = (s) => (s.changePercent ?? 0) >= 3 && (s.avgVolume10Day ?? 0) >= 10;
+
+// ─── Route ────────────────────────────────────────────────────────────────────
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const tab = searchParams.get('tab') || 'gap-ups';
 
-  const ETFs = new Set(['SPY', 'QQQ', 'IWM', 'ARKK', 'SOXS', 'SOXL', 'TQQQ', 'SQQQ']);
-  const stocks = SCAN_UNIVERSE.filter(s => !ETFs.has(s));
+  // Pick the right universe for this scan
+  const universeMap = {
+    'gap-ups':       GAP_UP_UNIVERSE,
+    'doublers':      DOUBLERS_UNIVERSE,
+    'strong-movers': STRONG_MOVERS_UNIVERSE,
+  };
+  const universe = universeMap[tab] ?? GAP_UP_UNIVERSE;
 
   try {
-    const all = await batchFetch(stocks);
+    const all    = await batchFetch(universe);
     const liquid = all.filter(hasMinVolume);
 
     let results = [];

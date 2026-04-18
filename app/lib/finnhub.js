@@ -107,42 +107,62 @@ export async function getBasicFinancials(symbol) {
   }
 }
 
-// Curated watchlist of high-liquidity US stocks to scan
-// These are well-known liquid names across sectors — easily extendable
+// Scan universe — mirrors EXCHANGE_MAP in exchangeMap.js exactly.
+// When adding a new symbol, add it to both files.
 export const SCAN_UNIVERSE = [
-// Mega Cap Tech
-'AAPL', 'AMZN', 'AVGO', 'GOOGL', 'META', 'MSFT', 'NVDA', 'ORCL', 'TSLA',
-
-// Semiconductors & Hardware
-'ADI', 'ALAB', 'AMD', 'ARMK', 'AEHR', 'FN', 'ICHR', 'MCHP', 'MPWR', 
-'VIAV', 'VSAT', 'VSH',
-
-// Financials
-'AXP', 'BAC', 'BLK', 'C', 'GS', 'JPM', 'MA', 'MS', 'SCHW', 'V', 'WFC',
-
-// Healthcare / Biotech
-'ABBV', 'AMGN', 'BIIB', 'GILD', 'JNJ', 'LLY', 'MRK', 'MRNA', 'PFE', 'UNH',
-
-// Energy
-'COP', 'CVX', 'MPC', 'OXY', 'PSX', 'SLB', 'VLO', 'XOM',
-
-// Consumer / Retail
-'COST', 'HD', 'LOW', 'MCD', 'NKE', 'SBUX', 'TGT', 'WMT',
-
-// Growth / High Momentum
-'ABNB', 'AFRM', 'ASTS', 'BE', 'CHWY', 'CIEN', 'COIN', 'CRDO', 
-'CRWV', 'DKNG', 'ENPH', 'FORM', 'GME', 'HOOD', 'HUT', 'IBRX', 'KULR', 
-'LCID', 'LGN', 'NET', 'NOW', 'PL', 'PLTR', 'POWL', 'RBLX', 'RIVN', 
-'RKLB', 'RLAY', 'SNAP', 'SOFI', 'STZ', 'U', 'UPST', 'W', 'WISH',
-
-// Industrials / Other
-'ASX', 'BW', 'CE', 'FDX', 'HUN', 'JBHT', 'KB', 'LAMR', 'MTZ', 'NOK', 
-'SEI', 'SKYQ',
-
-// Small / Speculative
-'AXIA', 'JKS', 'NBIS', 'SNDK',
-
-// ETFs & Leveraged
-'ARKK', 'IWM', 'QQQ', 'SOXL', 'SOXS', 'SPY', 'SQQQ', 'TQQQ'
+  // NASDAQ
+  'AAPL','ABNB','ADBE','ADI','ADP','ADSK','AEP','ALNY','AMAT','AMD',
+  'AMGN','AMZN','APP','ARM','ASML','AVGO','AXON','BKNG','BKR','CCEP',
+  'CDNS','CEG','CHTR','CMCSA','COST','CPRT','CRWD','CSCO','CSGP','CSX',
+  'CTAS','CTSH','DASH','DDOG','DXCM','EA','EXC','FANG','FAST','FER',
+  'FTNT','GEHC','GILD','GOOG','GOOGL','HON','IDXX','INSM','INTC','INTU',
+  'ISRG','KDP','KHC','KLAC','LIN','LRCX','MAR','MCHP','MDLZ','MELI',
+  'META','MNST','MPWR','MRVL','MSFT','MU','NFLX','NVDA','NXPI','ODFL',
+  'ORLY','PANW','PAYX','PCAR','PDD','PEP','PYPL','QCOM','REGN','ROP',
+  'ROST','SBUX','SHOP','SNPS','STX','TEAM','TMUS','TRI','TSLA','TTWO',
+  'TXN','VRSK','VRTX','WBD','WDAY','WDC','XEL','ZS',
+  // NYSE
+  'ABBV','AIG','ALL','AFL','ALLY','AMT','AMP','APD','AVB','AWK',
+  'AXP','BA','BAC','BG','BK','BLK','BMY','BX','C','CAT',
+  'CB','CCI','CFG','CI','CL','CLX','CMA','COF','COP','CPB',
+  'CTVA','CVX','D','DAL','DE','DELL','DFS','DHR','DIS','DLR',
+  'DUK','ECL','ED','EIX','ELV','EMR','EOG','EQIX','EQR','ESS',
+  'ETN','EXR','F','FDX','FE','FITB','GD','GE','GIS','GM',
+  'GS','HBAN','HCA','HD','HMC','IBM','ITW','INVH','JNJ',
+  'JPM','K','KEY','KMB','KMI','KO','LHX','LLY','LMT','LOW',
+  'LUV','MA','MAA','MCD','MDT','MET','MKC','MMM','MO','MPC',
+  'MRK','MS','MTB','NCLH','NEE','NKE','NOC','O','OXY','PCG',
+  'PEG','PFE','PG','PGR','PH','PLD','PM','PNC','PRU','PSA',
+  'PSX','RCL','RF','RSG','RTX','SCHW','SHW','SLB','SO','SPG',
+  'SPGI','SRE','STLA','SYF','SYK','T','TFC','TGT','TJX','TM',
+  'TMO','UAL','UNH','UNP','UPS','USB','V','VICI','VLO','VST',
+  'VZ','WEC','WFC','WM','WMB','WMT','XOM','ZION',
+  // High-momentum / growth
+  'MSTR','PLTR','AFRM','COIN','CRWV','DKNG','HOOD','LCID','PENN','RIVN',
+  'SOFI','UPST','WISH','CHWY','RBLX','SNAP','U','W',
+  // ETFs
+  'SQQQ','TQQQ','ARKK','IWM','QQQ','SOXL','SOXS','SPY',
 ];
 
+
+// Fetch earnings calendar for a date range
+// Returns a Set of symbols reporting earnings within the next 5 days
+export async function getUpcomingEarnings() {
+  try {
+    const today = new Date();
+    const future = new Date();
+    future.setDate(today.getDate() + 5);
+
+    const from = today.toISOString().split('T')[0];
+    const to   = future.toISOString().split('T')[0];
+
+    const data = await finnFetch(`/calendar/earnings?from=${from}&to=${to}`);
+    const symbols = new Set();
+    (data.earningsCalendar || []).forEach(e => {
+      if (e.symbol) symbols.add(e.symbol);
+    });
+    return symbols;
+  } catch {
+    return new Set();
+  }
+}
