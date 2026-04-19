@@ -1,4 +1,5 @@
 import { getQuote, getBasicFinancials } from '@/app/lib/finnhub';
+import extraSymbols from '@/app/lib/symbols_extra.json' assert { type: 'json' };
 
 // ─── Per-scan universes ───────────────────────────────────────────────────────
 // Each scan targets only the names that realistically produce that setup.
@@ -87,6 +88,7 @@ export async function GET(request) {
 
   // Pick the right universe for this scan
   const universeMap = {
+    'agent-earnings': extraSymbols,
     'gap-ups':       GAP_UP_UNIVERSE,
     'doublers':      DOUBLERS_UNIVERSE,
     'strong-movers': STRONG_MOVERS_UNIVERSE,
@@ -111,11 +113,17 @@ export async function GET(request) {
       results = liquid
         .filter(s => isDoubler(s) && isUpToday(s))
         .sort((a, b) => (b.weekReturn52 ?? 0) - (a.weekReturn52 ?? 0));
-    } else if (tab === 'strong-movers') {
-      results = liquid
-        .filter(isStrongMover)
-        .sort((a, b) => (b.changePercent ?? 0) - (a.changePercent ?? 0));
-    }
+      } else if (tab === 'strong-movers') {
+        results = liquid
+          .filter(isStrongMover)
+          .sort((a, b) => (b.changePercent ?? 0) - (a.changePercent ?? 0));
+      } else if (tab === 'agent-earnings') {
+        results = (await batchFetch(extraSymbols))
+          .filter(hasMinVolume)
+          .filter(isStrongMover)
+          .map(s => ({ ...s, hasEarnings: true }))
+          .sort((a, b) => (b.changePercent ?? 0) - (a.changePercent ?? 0));
+      }
 
     const enriched = results.slice(0, 20).map(s => ({
       ...s,

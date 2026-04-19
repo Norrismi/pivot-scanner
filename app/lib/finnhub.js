@@ -145,6 +145,7 @@ export const SCAN_UNIVERSE = [
 ];
 
 
+
 // Fetch earnings calendar for a date range
 // Returns a Set of symbols reporting earnings within the next 5 days
 export async function getUpcomingEarnings() {

@@ -19,6 +19,11 @@ const TABS = [
     label: 'Strong Movers',
     desc: 'High-volume stocks making aggressive price moves. Institutional activity confirmed.',
   },
+  {
+    id: 'agent-earnings',
+    label: 'Agent: Earnings',
+    desc: 'Stocks reporting earnings within 2 days, filtered for liquidity and momentum. Sourced nightly by the earnings agent.',
+  },
 ];
 
 export default function ScannerTabs() {
