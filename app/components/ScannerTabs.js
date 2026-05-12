@@ -24,6 +24,11 @@ const TABS = [
     label: 'Agent: Earnings',
     desc: 'Stocks reporting earnings within 2 days, filtered for liquidity and momentum. Sourced nightly by the earnings agent.',
   },
+  {
+    id: 'agent-oversold',
+    label: 'Agent: Oversold',
+    desc: 'Liquid tech, energy, and semiconductor stocks with RSI below 35. Sourced nightly by the oversold scanner. Weakest names first.',
+  },
 ];
 
 export default function ScannerTabs() {
